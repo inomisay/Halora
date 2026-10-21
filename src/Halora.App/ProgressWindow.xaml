@@ -1,0 +1,54 @@
+<Window x:Class="Halora.App.ProgressWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Halora"
+        Width="360" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="False">
+
+    <Border Margin="12" CornerRadius="16" Background="{StaticResource InkBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1" Padding="16,12">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.45" Color="Black" />
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Ellipse Grid.Row="0" Grid.Column="0" Width="12" Height="12" Margin="0,0,10,0" VerticalAlignment="Center"
+                     Stroke="{StaticResource HaloBrush}" StrokeThickness="2.5" />
+            <TextBlock x:Name="HeadText" Grid.Row="0" Grid.Column="1" Foreground="{StaticResource TextBrush}"
+                       FontFamily="{StaticResource DisplayFont}" FontSize="13.5" FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis" />
+            <Button x:Name="CloseButton" Grid.Row="0" Grid.Column="2" Content="✕" Style="{StaticResource LinkButton}"
+                    Padding="7,2" ToolTip="Close" />
+
+            <TextBlock x:Name="DetailText" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,4,0,0"
+                       Foreground="{StaticResource MutedTextBrush}" FontFamily="{StaticResource UiFont}" FontSize="11.5"
+                       TextTrimming="CharacterEllipsis" />
+
+            <Grid x:Name="Track" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Height="3" Margin="0,9,0,0">
+                <Border Background="#22FFFFFF" CornerRadius="2" />
+                <Border x:Name="Fill" Background="{StaticResource HaloBrush}" CornerRadius="2"
+                        HorizontalAlignment="Left" Width="0" />
+            </Grid>
+
+            <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Margin="0,8,0,0">
+                <Button x:Name="DetailsButton" Content="Details" Style="{StaticResource LinkButton}" Visibility="Collapsed" Margin="0,0,6,0" />
+                <Button x:Name="OpenButton" Content="Show in folder" Style="{StaticResource LinkButton}" Visibility="Collapsed" />
+                <Button x:Name="CancelButton" Content="Cancel" Style="{StaticResource LinkButton}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
