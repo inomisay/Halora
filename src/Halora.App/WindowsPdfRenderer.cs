@@ -12,7 +12,7 @@ namespace Halora.App;
 /// <summary>Renders PDF pages with the PDF engine built into Windows 10 and 11.</summary>
 internal sealed class WindowsPdfRenderer : IPdfRenderer
 {
-    private const double Scale = 2.0; // page sizes are in 1/96 inch, so 2x is about 192 DPI
+    private const double Scale = 300.0 / 96.0; // page sizes are in 1/96 inch; this renders at 300 DPI, print quality
 
     public async Task<IReadOnlyList<string>> RenderPagesAsync(string pdfPath, string outputFolder, string imageExtension, CancellationToken ct)
     {

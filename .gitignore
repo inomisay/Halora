@@ -484,3 +484,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Installer output
+dist/
+publish-setup/

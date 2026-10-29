@@ -18,6 +18,10 @@
     <Description>Drag a file, hold Shift, let go, convert.</Description>
     <!-- Lets the project build (not run) on Linux/macOS CI too. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- The installer build uses the shared .NET runtime. Run on a newer major version when 8 isn't installed. -->
+    <RollForward>Major</RollForward>
+    <!-- The UI is English only; skip the translated WPF/WinForms resources (saves ~6 MB). -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>

@@ -86,9 +86,16 @@ public static class PdfWriter
     private static void Write(Stream stream, string text) => stream.Write(Encoding.Latin1.GetBytes(text));
 }
 
-public readonly record struct JpegInfo(int Width, int Height, int Components)
+/// <param name="Orientation">EXIF orientation, 1 when the file has none (no rotation).</param>
+public readonly record struct JpegInfo(int Width, int Height, int Components, int Marker, int Orientation)
 {
-    /// <summary>Reads the size from the JPEG's start-of-frame marker.</summary>
+    /// <summary>
+    /// True when a PDF reader shows this file exactly as an image viewer would: baseline or
+    /// progressive Huffman coding, gray or RGB, and no EXIF rotation (PDF ignores EXIF).
+    /// </summary>
+    public bool CanEmbedAsIs => Marker is 0xC0 or 0xC1 or 0xC2 && Components is 1 or 3 && Orientation == 1;
+
+    /// <summary>Reads the size from the JPEG's start-of-frame marker, and the EXIF orientation before it.</summary>
     public static JpegInfo Read(string path)
     {
         using var s = File.OpenRead(path);
@@ -97,6 +104,7 @@ public readonly record struct JpegInfo(int Width, int Height, int Components)
             throw new InvalidDataException("Not a JPEG file.");
         }
 
+        var orientation = 1;
         while (true)
         {
             var b = s.ReadByte();
@@ -120,10 +128,57 @@ public readonly record struct JpegInfo(int Width, int Height, int Components)
                 var height = (s.ReadByte() << 8) | s.ReadByte();
                 var width = (s.ReadByte() << 8) | s.ReadByte();
                 var components = s.ReadByte();
-                return new JpegInfo(width, height, components);
+                return new JpegInfo(width, height, components, marker, orientation);
+            }
+
+            if (marker == 0xE1 && length > 2)
+            {
+                var segment = new byte[length - 2];
+                s.ReadExactly(segment);
+                orientation = ExifOrientation(segment) ?? orientation;
+                continue;
             }
 
             s.Seek(length - 2, SeekOrigin.Current);
         }
+    }
+
+    /// <summary>Finds tag 0x0112 in the first IFD of an APP1 "Exif" segment.</summary>
+    private static int? ExifOrientation(byte[] app1)
+    {
+        const int tiff = 6; // after "Exif\0\0"
+        if (app1.Length < tiff + 8 || app1[0] != 'E' || app1[1] != 'x' || app1[2] != 'i' || app1[3] != 'f')
+        {
+            return null;
+        }
+
+        var little = app1[tiff] == 'I';
+        int U16(int at) => little ? app1[at] | (app1[at + 1] << 8) : (app1[at] << 8) | app1[at + 1];
+        int U32(int at) => little
+            ? app1[at] | (app1[at + 1] << 8) | (app1[at + 2] << 16) | (app1[at + 3] << 24)
+            : (app1[at] << 24) | (app1[at + 1] << 16) | (app1[at + 2] << 8) | app1[at + 3];
+
+        var ifd = tiff + U32(tiff + 4);
+        if (ifd < tiff || ifd + 2 > app1.Length)
+        {
+            return null;
+        }
+
+        var count = U16(ifd);
+        for (var i = 0; i < count; i++)
+        {
+            var entry = ifd + 2 + (i * 12);
+            if (entry + 12 > app1.Length)
+            {
+                return null;
+            }
+
+            if (U16(entry) == 0x0112)
+            {
+                return U16(entry + 8);
+            }
+        }
+
+        return null;
     }
 }

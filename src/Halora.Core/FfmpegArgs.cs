@@ -8,8 +8,9 @@ namespace Halora.Core;
 public static class FfmpegArgs
 {
     // Paints the image over a white canvas so transparent areas don't turn black in JPG.
+    // Full-resolution color (4:4:4) keeps small colored text and sharp edges crisp.
     private const string FlattenOnWhite =
-        "[0:v]format=rgba,split[a][b];[a]drawbox=c=white@1:t=fill[bg];[bg][b]overlay=format=auto,format=yuvj420p";
+        "[0:v]format=rgba,split[a][b];[a]drawbox=c=white@1:t=fill[bg];[bg][b]overlay=format=auto,format=yuvj444p";
 
     private const string GifFilter =
         @"fps=12,scale=min(480\,iw):-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4";
@@ -32,8 +33,8 @@ public static class FfmpegArgs
 
             case "img.webp":
                 args.AddRange(isGif
-                    ? ["-c:v", "libwebp", "-quality", "85", "-loop", "0"]
-                    : ["-frames:v", "1", "-c:v", "libwebp", "-quality", "85"]);
+                    ? ["-c:v", "libwebp", "-quality", "85", "-compression_level", "6", "-loop", "0"]
+                    : ["-frames:v", "1", "-c:v", "libwebp", "-quality", "85", "-compression_level", "6"]);
                 break;
 
             case "img.avif":
@@ -46,7 +47,7 @@ public static class FfmpegArgs
                 break;
 
             case "img.half":
-                args.AddRange(["-frames:v", "1", "-vf", @"scale=max(1\,trunc(iw/2)):max(1\,trunc(ih/2))"]);
+                args.AddRange(["-frames:v", "1", "-vf", @"scale=max(1\,trunc(iw/2)):max(1\,trunc(ih/2)):flags=lanczos"]);
                 args.AddRange(QualityFor(outExt));
                 break;
 
@@ -74,7 +75,7 @@ public static class FfmpegArgs
             case "vid.compress":
                 args.AddRange(["-map", "0:v:0", "-map", "0:a:0?",
                     "-c:v", "libx264", "-preset", "slow", "-crf", "28", "-pix_fmt", "yuv420p",
-                    "-vf", @"scale=-2:trunc(min(1080\,ih)/2)*2",
+                    "-vf", @"scale=-2:trunc(min(1080\,ih)/2)*2:flags=lanczos",
                     "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart"]);
                 break;
 
@@ -124,7 +125,7 @@ public static class FfmpegArgs
     private static string[] QualityFor(string ext) => ext switch
     {
         ".jpg" or ".jpeg" => ["-q:v", "2"],
-        ".webp" => ["-c:v", "libwebp", "-quality", "90"],
+        ".webp" => ["-c:v", "libwebp", "-quality", "90", "-compression_level", "6"],
         ".avif" => ["-c:v", "libaom-av1", "-still-picture", "1", "-crf", "28", "-cpu-used", "6", "-pix_fmt", "yuv420p"],
         _ => [],
     };

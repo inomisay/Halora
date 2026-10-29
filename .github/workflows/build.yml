@@ -33,23 +33,61 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Publish single-file Halora.exe
+      - name: Pick version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -like "refs/tags/v*") {
+            $v = "${{ github.ref_name }}".TrimStart("v")
+          } else {
+            $v = ([xml](Get-Content src/Halora.App/Halora.App.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          }
+          "value=$v" >> $env:GITHUB_OUTPUT
+
+      # Portable: one exe with .NET inside, nothing to install.
+      - name: Publish portable Halora.exe
         run: >
           dotnet publish src/Halora.App/Halora.App.csproj -c Release -r win-x64
           --self-contained true
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:EnableCompressionInSingleFile=true
+          -p:DebugType=none
+          -p:Version=${{ steps.version.outputs.value }}
           -o publish
       - name: Zip
         shell: pwsh
         run: Compress-Archive -Path publish/Halora.exe -DestinationPath Halora-win-x64.zip
+
+      # Installer: uses the shared .NET runtime, so it is ~4 MB instead of ~70 MB.
+      - name: Publish Halora.exe for the installer
+        run: >
+          dotnet publish src/Halora.App/Halora.App.csproj -c Release -r win-x64
+          --self-contained false
+          -p:PublishSingleFile=true
+          -p:DebugType=none
+          -p:Version=${{ steps.version.outputs.value }}
+          -o publish-setup
+      - name: Get Inno Setup 6.7.4
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe -OutFile innosetup.exe
+          if ((Get-AuthenticodeSignature innosetup.exe).Status -ne "Valid") { throw "Inno Setup download isn't validly signed." }
+          Start-Process innosetup.exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/PORTABLE=1", "/DIR=$env:RUNNER_TEMP\inno" -Wait
+      - name: Build installer
+        shell: pwsh
+        run: '& "$env:RUNNER_TEMP\inno\ISCC.exe" /Q "/DAppVersion=${{ steps.version.outputs.value }}" installer/Halora.iss'
+
       - uses: actions/upload-artifact@v4
         with:
           name: Halora-win-x64
-          path: Halora-win-x64.zip
+          path: |
+            Halora-win-x64.zip
+            dist/Halora-Setup-*.exe
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: Halora-win-x64.zip
+          files: |
+            Halora-win-x64.zip
+            dist/Halora-Setup-*.exe

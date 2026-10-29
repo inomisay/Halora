@@ -81,6 +81,34 @@ var built = FfmpegArgs.Build(ActionCatalog.All.First(a => a.Id == "img.webp"), w
 Check("path passed as one argument", built.Contains(weird));
 Check("never overwrites (-n)", built.Contains("-n") && !built.Contains("-y"));
 
+Console.WriteLine("JPEG headers");
+string JpegHeader(string name, int sof, byte[]? exif)
+{
+    var bytes = new List<byte> { 0xFF, 0xD8 };
+    if (exif is not null)
+    {
+        bytes.AddRange([0xFF, 0xE1, (byte)((exif.Length + 2) >> 8), (byte)(exif.Length + 2)]);
+        bytes.AddRange(exif);
+    }
+
+    // Start of frame: precision 8, height 48, width 64, 3 components.
+    bytes.AddRange([0xFF, (byte)sof, 0x00, 0x11, 8, 0x00, 48, 0x00, 64, 3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1]);
+    var path = Path.Combine(root, name);
+    File.WriteAllBytes(path, [.. bytes]);
+    return path;
+}
+
+// "Exif\0\0", big-endian TIFF header, one IFD entry: orientation (0x0112), SHORT, count 1, value 6.
+byte[] rotatedExif = [.. "Exif\0\0"u8, .. "MM"u8, 0, 42, 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0, 0, 0, 0, 0];
+var plain = JpegInfo.Read(JpegHeader("plain.jpg", 0xC0, null));
+Check("jpeg size read", plain is { Width: 64, Height: 48, Components: 3 }, plain.ToString());
+Check("plain jpeg embeds as-is", plain.CanEmbedAsIs);
+var turned = JpegInfo.Read(JpegHeader("turned.jpg", 0xC0, rotatedExif));
+Check("exif rotation read", turned.Orientation == 6, turned.ToString());
+Check("rotated jpeg is re-encoded", !turned.CanEmbedAsIs);
+Check("progressive jpeg embeds as-is", JpegInfo.Read(JpegHeader("prog.jpg", 0xC2, null)).CanEmbedAsIs);
+Check("arithmetic jpeg is re-encoded", !JpegInfo.Read(JpegHeader("arith.jpg", 0xC9, null)).CanEmbedAsIs);
+
 // ---------- Conversion checks (real FFmpeg) ----------
 var ffmpeg = Ffmpeg.Locate();
 if (ffmpeg is null)
@@ -181,6 +209,21 @@ else
         Run("pdftoppm", "-r", "20", "-png", pdf.Output!, Path.Combine(root, "render"));
         Check("pdf pages render", Directory.GetFiles(root, "render*.png").Length == 3);
     }
+
+    var photoPdf = await Do("img.pdf", jpg);
+    if (photoPdf.Status == ResultStatus.Done)
+    {
+        var pdfBytes = File.ReadAllBytes(photoPdf.Output!);
+        var jpgBytes = File.ReadAllBytes(jpg);
+        Check("jpg goes into pdf byte for byte", pdfBytes.AsSpan().IndexOf(jpgBytes) >= 0);
+    }
+    else
+    {
+        Check("jpg to pdf", false, photoPdf.Message ?? "");
+    }
+
+    var chroma = Probe(Path.Combine(root, "alpha shot.jpg"), "stream=pix_fmt");
+    Check("jpg output keeps full color resolution (4:4:4)", chroma.Contains("444"), chroma);
 
     var skipped = await service.RunAsync(ActionCatalog.All.First(a => a.Id == "aud.mp3"), [png, wav]);
     Check("mixed run skips non-audio", skipped.Count(r => r.Status == ResultStatus.Skipped) == 1 && skipped.Count(r => r.Status == ResultStatus.Done) == 1);

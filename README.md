@@ -23,12 +23,15 @@ You can drop several files at once, even of different kinds. Files that don't fi
 
 ## Install
 
-1. Download `Halora-win-x64.zip` from [Releases](../../releases) and unzip it anywhere.
-2. Install FFmpeg once. Open Terminal and run:
-   ```
-   winget install Gyan.FFmpeg
-   ```
-3. Run `Halora.exe`. It appears in the tray. Right-click the icon for **Start with Windows**.
+Download from [Releases](../../releases). There are two versions:
+
+- **`Halora-Setup-x.y.z.exe` (recommended, ~4 MB).** Installs for your user only, no admin needed. It adds Halora to the Start menu, can start it with Windows, and can install FFmpeg for you. Halora uses Microsoft's free .NET Desktop Runtime; if your PC doesn't have it, setup downloads it (~60 MB, once).
+- **`Halora-win-x64.zip` (portable, ~70 MB).** One `Halora.exe` with .NET built in. Unzip it anywhere and run it. Install FFmpeg yourself once:
+  ```
+  winget install Gyan.FFmpeg
+  ```
+
+Halora appears in the tray. Right-click the icon for **Start with Windows**.
 
 Windows SmartScreen may warn the first time because the app isn't code-signed yet. Click **More info → Run anyway**.
 
@@ -41,7 +44,7 @@ Windows has no event for "a file is being dragged somewhere", so Halora:
 3. shows an invisible drop window that follows the cursor,
 4. reads the file paths when you let go, and always answers **Copy** so Explorer never deletes the original. In Explorer, Shift + drag normally means *move*.
 
-Conversions use [FFmpeg](https://ffmpeg.org). PDF pages are rendered with the PDF engine built into Windows. Images → PDF is written by Halora itself, embedding the JPEGs without re-compressing them.
+Conversions use [FFmpeg](https://ffmpeg.org). PDF pages are rendered with the PDF engine built into Windows. Images → PDF is written by Halora itself. JPG photos go in byte for byte, with no re-compression. Other images (and JPGs with an EXIF rotation) become high-quality JPEG pages.
 
 ```
 src/Halora.Core    conversions, formats, file naming (plain .NET, tested on Linux too)
@@ -63,6 +66,8 @@ Needs the .NET 8 SDK on Windows.
 dotnet run --project tests/Halora.Tests    # needs ffmpeg, ffprobe, qpdf and pdfinfo on PATH
 dotnet run --project src/Halora.App
 ```
+
+The installer is built with [Inno Setup](https://jrsoftware.org/isinfo.php) 6 from [installer/Halora.iss](installer/Halora.iss); see `.github/workflows/build.yml` for the exact steps.
 
 ## License
 

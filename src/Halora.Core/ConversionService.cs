@@ -118,6 +118,13 @@ public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRende
             var pages = new List<string>();
             for (var i = 0; i < images.Count; i++)
             {
+                // A JPEG that PDF can show as-is goes in byte for byte: no second compression.
+                if (Formats.SameFormat(images[i], ".jpg") && JpegInfo.Read(images[i]).CanEmbedAsIs)
+                {
+                    pages.Add(images[i]);
+                    continue;
+                }
+
                 var page = Path.Combine(temp, $"{i:D4}.jpg");
                 await Ffmpeg.RunAsync(ffmpegPath, FfmpegArgs.ImageToJpegForPdf(images[i], page), ct).ConfigureAwait(false);
                 pages.Add(page);
