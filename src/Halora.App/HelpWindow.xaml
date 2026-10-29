@@ -1,0 +1,147 @@
+<Window x:Class="Halora.App.HelpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="How to use Halora"
+        Width="460" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Halora;component/Assets/halora.ico">
+
+    <Window.Resources>
+        <Style x:Key="StepNumber" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="StepTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+            <Setter Property="FontSize" Value="14.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="Body" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="LineHeight" Value="18" />
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="Card" Margin="16" CornerRadius="18" Background="{StaticResource InkBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1" Padding="26,20,26,22">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="3" Opacity="0.5" Color="Black" />
+        </Border.Effect>
+
+        <StackPanel>
+            <!-- Header -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Image Source="pack://application:,,,/Halora;component/Assets/halora.ico" Width="32" Height="32" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,12,0" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="How to use Halora" Foreground="{StaticResource TextBrush}"
+                               FontFamily="{StaticResource DisplayFont}" FontSize="19" FontWeight="SemiBold" />
+                    <TextBlock Text="Convert any file with one drag." Style="{StaticResource Body}" />
+                </StackPanel>
+                <Button x:Name="CloseButton" Grid.Column="2" Content="✕" Style="{StaticResource LinkButton}"
+                        Padding="8,3" VerticalAlignment="Top" ToolTip="Close" />
+            </Grid>
+
+            <!-- Steps -->
+            <Grid Margin="0,20,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Width="32" Height="32" VerticalAlignment="Top" Margin="0,0,14,0">
+                    <Ellipse Stroke="{StaticResource HaloBrush}" StrokeThickness="2" />
+                    <TextBlock Text="1" Style="{StaticResource StepNumber}" />
+                </Grid>
+                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,16">
+                    <TextBlock Text="Start dragging a file" Style="{StaticResource StepTitle}" />
+                    <TextBlock Style="{StaticResource Body}" Margin="0,2,0,0"
+                               Text="From File Explorer or the desktop. Photos, videos, music and PDFs all work, and you can drag several files at once." />
+                </StackPanel>
+
+                <Grid Grid.Row="1" Width="32" Height="32" VerticalAlignment="Top" Margin="0,0,14,0">
+                    <Ellipse Stroke="{StaticResource HaloBrush}" StrokeThickness="2" />
+                    <TextBlock Text="2" Style="{StaticResource StepNumber}" />
+                </Grid>
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,16">
+                    <TextBlock Style="{StaticResource StepTitle}">
+                        <Run Text="Hold" />
+                        <InlineUIContainer BaselineAlignment="Center">
+                            <Border Style="{StaticResource KeyCap}">
+                                <TextBlock Text="Shift" Foreground="{StaticResource TextBrush}" FontFamily="{StaticResource UiFont}" FontSize="12" />
+                            </Border>
+                        </InlineUIContainer>
+                        <Run Text="and let go" />
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource Body}" Margin="0,2,0,0"
+                               Text="While you're still dragging, press and hold Shift, then drop the file anywhere on the screen." />
+                </StackPanel>
+
+                <Grid Grid.Row="2" Width="32" Height="32" VerticalAlignment="Top" Margin="0,0,14,0">
+                    <Ellipse Stroke="{StaticResource HaloBrush}" StrokeThickness="2" />
+                    <TextBlock Text="3" Style="{StaticResource StepNumber}" />
+                </Grid>
+                <StackPanel Grid.Row="2" Grid.Column="1">
+                    <TextBlock Text="Pick a format" Style="{StaticResource StepTitle}" />
+                    <TextBlock Style="{StaticResource Body}" Margin="0,2,0,0"
+                               Text="A circle of formats opens where you dropped. Click one. The new file is saved next to the original, and the original is never changed." />
+                </StackPanel>
+            </Grid>
+
+            <!-- Tips -->
+            <Border Margin="0,20,0,0" Padding="14,10" CornerRadius="12" Background="#14FFFFFF">
+                <StackPanel>
+                    <TextBlock Text="Good to know" Foreground="{StaticResource TextBrush}" FontFamily="{StaticResource UiFont}"
+                               FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource Body}" Text="•" Width="14" DockPanel.Dock="Left" />
+                        <TextBlock Style="{StaticResource Body}" Text="To cancel, let go of Shift before you drop." />
+                    </DockPanel>
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource Body}" Text="•" Width="14" DockPanel.Dock="Left" />
+                        <TextBlock Style="{StaticResource Body}" Text="Halora lives in the tray next to the clock (it may be under the ^ arrow). Right-click its icon for settings, or to switch it off when you want Shift + drag to move files in Explorer." />
+                    </DockPanel>
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource Body}" Text="•" Width="14" DockPanel.Dock="Left" />
+                        <TextBlock Style="{StaticResource Body}" Text="To see this again: double-click the tray icon, or right-click it and choose How to use." />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Only when FFmpeg is missing -->
+            <Border x:Name="FfmpegPanel" Margin="0,12,0,0" Padding="14,10" CornerRadius="12"
+                    BorderBrush="{StaticResource ErrorBrush}" BorderThickness="1" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource Body}" VerticalAlignment="Center" Margin="0,0,12,0"
+                               Text="Images, video and audio need FFmpeg, a free tool. Only PDF to image works without it." />
+                    <Button x:Name="FfmpegButton" Grid.Column="1" Content="Install FFmpeg…" Style="{StaticResource LinkButton}" />
+                </Grid>
+            </Border>
+
+            <Button x:Name="DoneButton" Content="Got it" Style="{StaticResource PrimaryButton}"
+                    HorizontalAlignment="Right" Margin="0,18,0,0" IsDefault="True" />
+        </StackPanel>
+    </Border>
+</Window>

@@ -109,6 +109,44 @@ Check("rotated jpeg is re-encoded", !turned.CanEmbedAsIs);
 Check("progressive jpeg embeds as-is", JpegInfo.Read(JpegHeader("prog.jpg", 0xC2, null)).CanEmbedAsIs);
 Check("arithmetic jpeg is re-encoded", !JpegInfo.Read(JpegHeader("arith.jpg", 0xC9, null)).CanEmbedAsIs);
 
+Console.WriteLine("Lossless PDF pages");
+{
+    // Odd width, random pixels: the worst case for the row filter.
+    const int w = 7, h = 5;
+    var pixels = new byte[w * h * 3];
+    new Random(42).NextBytes(pixels);
+    var ppm = Path.Combine(root, "pixels.ppm");
+    File.WriteAllBytes(ppm, [.. System.Text.Encoding.ASCII.GetBytes($"P6\n{w} {h}\n255\n"), .. pixels]);
+
+    var image = PdfImage.FromPpm(ppm);
+    var lossless = Path.Combine(root, "lossless.pdf");
+    PdfWriter.WritePages([image], lossless);
+    var pdfText = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(lossless));
+    Check("pdf uses FlateDecode with PNG predictor", pdfText.Contains("/FlateDecode") && pdfText.Contains("/Predictor 15"));
+
+    // Undo what a PDF reader undoes: zlib, then the per-row Paeth filter.
+    using var inflate = new System.IO.Compression.ZLibStream(new MemoryStream(image.Data), System.IO.Compression.CompressionMode.Decompress);
+    using var filtered = new MemoryStream();
+    inflate.CopyTo(filtered);
+    var f = filtered.ToArray();
+    var decoded = new byte[w * h * 3];
+    var stride = w * 3;
+    for (var y = 0; y < h; y++)
+    {
+        for (var x = 0; x < stride; x++)
+        {
+            int a = x >= 3 ? decoded[(y * stride) + x - 3] : 0;
+            int b = y > 0 ? decoded[((y - 1) * stride) + x] : 0;
+            int c = x >= 3 && y > 0 ? decoded[((y - 1) * stride) + x - 3] : 0;
+            var p = a + b - c;
+            var pred = Math.Abs(p - a) <= Math.Abs(p - b) && Math.Abs(p - a) <= Math.Abs(p - c) ? a : Math.Abs(p - b) <= Math.Abs(p - c) ? b : c;
+            decoded[(y * stride) + x] = (byte)(f[(y * (stride + 1)) + 1 + x] + pred);
+        }
+    }
+
+    Check("lossless page decodes to the exact pixels", f.Length == h * (stride + 1) && decoded.AsSpan().SequenceEqual(pixels));
+}
+
 // ---------- Conversion checks (real FFmpeg) ----------
 var ffmpeg = Ffmpeg.Locate();
 if (ffmpeg is null)
@@ -189,7 +227,7 @@ else
     var muted = Path.Combine(root, "clip (muted).mp4");
     Check("muted video has no audio", Probe(muted, "stream=codec_type").Trim() == "video");
 
-    var half = Probe(Path.Combine(root, "photo (50%).jpg"), "stream=width,height").Replace("\n", "x");
+    var half = Probe(Path.Combine(root, "photo (50%).jpg"), "stream=width,height").ReplaceLineEndings("x");
     Check("50% resize", half == "101x75", half);
 
     var noSound = await Do("vid.mp3", silent);
@@ -201,6 +239,13 @@ else
 
     var pdf = await Do("img.pdf", png, jpg, gif);
     Check("combine to pdf", pdf.Status == ResultStatus.Done && pdf.Output!.EndsWith("Combined.pdf"), pdf.Message ?? "");
+    if (pdf.Status == ResultStatus.Done)
+    {
+        var combined = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(pdf.Output!));
+        Check("png and gif pages are lossless, jpg page is the original jpeg",
+            System.Text.RegularExpressions.Regex.Matches(combined, "/FlateDecode").Count == 2 &&
+            System.Text.RegularExpressions.Regex.Matches(combined, "/DCTDecode").Count == 1);
+    }
     if (pdf.Status == ResultStatus.Done)
     {
         Run("qpdf", "--check", pdf.Output!);

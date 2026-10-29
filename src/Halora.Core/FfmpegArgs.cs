@@ -9,8 +9,10 @@ public static class FfmpegArgs
 {
     // Paints the image over a white canvas so transparent areas don't turn black in JPG.
     // Full-resolution color (4:4:4) keeps small colored text and sharp edges crisp.
-    private const string FlattenOnWhite =
-        "[0:v]format=rgba,split[a][b];[a]drawbox=c=white@1:t=fill[bg];[bg][b]overlay=format=auto,format=yuvj444p";
+    private const string FlattenOnWhite = FlattenOnWhiteTo + "yuvj444p";
+
+    private const string FlattenOnWhiteTo =
+        "[0:v]format=rgba,split[a][b];[a]drawbox=c=white@1:t=fill[bg];[bg][b]overlay=format=auto,format=";
 
     private const string GifFilter =
         @"fps=12,scale=min(480\,iw):-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4";
@@ -119,6 +121,11 @@ public static class FfmpegArgs
     public static List<string> ImageToJpegForPdf(string input, string output) =>
         ["-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", input,
          "-frames:v", "1", "-filter_complex", FlattenOnWhite, "-q:v", "2", output];
+
+    /// <summary>Exact RGB pixels for a lossless PDF page: flattened on white, saved as PPM.</summary>
+    public static List<string> ImageToPpmForPdf(string input, string output) =>
+        ["-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", input,
+         "-frames:v", "1", "-filter_complex", FlattenOnWhiteTo + "rgb24", "-c:v", "ppm", output];
 
     private static readonly string[] AudioOnly = ["-vn", "-map", "0:a:0", "-map_metadata", "0"];
 

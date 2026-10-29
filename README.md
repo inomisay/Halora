@@ -31,7 +31,7 @@ Download from [Releases](../../releases). There are two versions:
   winget install Gyan.FFmpeg
   ```
 
-Halora appears in the tray. Right-click the icon for **Start with Windows**.
+Halora appears in the tray and opens a short **How to use** guide the first time. Double-click the tray icon to see it again, or right-click it for settings like **Start with Windows**.
 
 Windows SmartScreen may warn the first time because the app isn't code-signed yet. Click **More info → Run anyway**.
 
@@ -44,7 +44,7 @@ Windows has no event for "a file is being dragged somewhere", so Halora:
 3. shows an invisible drop window that follows the cursor,
 4. reads the file paths when you let go, and always answers **Copy** so Explorer never deletes the original. In Explorer, Shift + drag normally means *move*.
 
-Conversions use [FFmpeg](https://ffmpeg.org). PDF pages are rendered with the PDF engine built into Windows. Images → PDF is written by Halora itself. JPG photos go in byte for byte, with no re-compression. Other images (and JPGs with an EXIF rotation) become high-quality JPEG pages.
+Conversions use [FFmpeg](https://ffmpeg.org). PDF pages are rendered with the PDF engine built into Windows. Images → PDF is written by Halora itself. JPG photos go in byte for byte, with no re-compression. PNG, BMP, TIFF and GIF pages are stored losslessly, so screenshots and text stay pixel-sharp. Only already-lossy formats (WebP, AVIF, HEIC) and rotated JPGs get one high-quality JPEG pass.
 
 ```
 src/Halora.Core    conversions, formats, file naming (plain .NET, tested on Linux too)

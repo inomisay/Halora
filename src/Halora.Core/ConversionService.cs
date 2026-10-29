@@ -115,22 +115,35 @@ public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRende
 
         try
         {
-            var pages = new List<string>();
+            var pages = new List<PdfImage>();
             for (var i = 0; i < images.Count; i++)
             {
+                var image = images[i];
+
                 // A JPEG that PDF can show as-is goes in byte for byte: no second compression.
-                if (Formats.SameFormat(images[i], ".jpg") && JpegInfo.Read(images[i]).CanEmbedAsIs)
+                if (Formats.SameFormat(image, ".jpg") && JpegInfo.Read(image).CanEmbedAsIs)
                 {
-                    pages.Add(images[i]);
+                    pages.Add(PdfImage.FromJpeg(image));
                     continue;
                 }
 
+                // Screenshots, drawings and other lossless images stay pixel-exact.
+                if (Formats.IsLossless(image))
+                {
+                    var pixels = Path.Combine(temp, $"{i:D4}.ppm");
+                    await Ffmpeg.RunAsync(ffmpegPath, FfmpegArgs.ImageToPpmForPdf(image, pixels), ct).ConfigureAwait(false);
+                    pages.Add(PdfImage.FromPpm(pixels));
+                    File.Delete(pixels);
+                    continue;
+                }
+
+                // Already-lossy photos (WebP, AVIF, HEIC, rotated JPG): one high-quality JPEG pass.
                 var page = Path.Combine(temp, $"{i:D4}.jpg");
-                await Ffmpeg.RunAsync(ffmpegPath, FfmpegArgs.ImageToJpegForPdf(images[i], page), ct).ConfigureAwait(false);
-                pages.Add(page);
+                await Ffmpeg.RunAsync(ffmpegPath, FfmpegArgs.ImageToJpegForPdf(image, page), ct).ConfigureAwait(false);
+                pages.Add(PdfImage.FromJpeg(page));
             }
 
-            PdfWriter.WriteJpegPages(pages, output);
+            PdfWriter.WritePages(pages, output);
             return new(first, ResultStatus.Done, output);
         }
         catch (Exception ex) when (ex is FfmpegException or IOException or InvalidDataException)

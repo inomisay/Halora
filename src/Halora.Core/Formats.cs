@@ -54,6 +54,10 @@ public static class Formats
     public static MediaKind KindOf(string path) =>
         Kinds.TryGetValue(Path.GetExtension(path), out var kind) ? kind : MediaKind.Unknown;
 
+    /// <summary>Formats that store every pixel exactly, so a copy of them should too.</summary>
+    public static bool IsLossless(string path) =>
+        new[] { ".png", ".bmp", ".tif", ".gif", ".ico" }.Any(ext => SameFormat(path, ext));
+
     /// <summary>Treats .jpg/.jpeg and .tif/.tiff as the same format.</summary>
     public static bool SameFormat(string path, string extension)
     {

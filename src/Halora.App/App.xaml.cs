@@ -20,6 +20,7 @@ public partial class App : System.Windows.Application
     private Forms.ToolStripMenuItem? _ffmpegItem;
     private ConversionService _service = new(null);
     private readonly List<ProgressWindow> _cards = [];
+    private HelpWindow? _help;
     private readonly DispatcherTimer _dropGrace = new() { Interval = TimeSpan.FromMilliseconds(600) };
 
     protected override void OnStartup(StartupEventArgs e)
@@ -91,12 +92,22 @@ public partial class App : System.Windows.Application
         {
             _settings.SeenWelcome = true;
             _settings.Save();
-            _tray!.ShowBalloonTip(
-                6000,
-                "Halora is running",
-                "Drag any file, hold Shift, and let go. Halora lives here in the tray.",
-                Forms.ToolTipIcon.None);
+            ShowHelp();
         }
+    }
+
+    private void ShowHelp()
+    {
+        if (_help is not null)
+        {
+            _help.Activate();
+            return;
+        }
+
+        _help = new HelpWindow(_service.HasFfmpeg, ShowFfmpegHelp);
+        _help.Closed += (_, _) => _help = null;
+        _help.Show();
+        _help.Activate();
     }
 
     private void RefreshFfmpeg()
@@ -168,11 +179,7 @@ public partial class App : System.Windows.Application
         autostart.CheckedChanged += (_, _) => Autostart.Set(autostart.Checked);
 
         var howTo = new Forms.ToolStripMenuItem("How to use");
-        howTo.Click += (_, _) => _tray!.ShowBalloonTip(
-            6000,
-            "How to use Halora",
-            "Start dragging a file, hold Shift, and let go anywhere. Pick a format from the circle. The new file is saved next to the original.",
-            Forms.ToolTipIcon.None);
+        howTo.Click += (_, _) => ShowHelp();
 
         _ffmpegItem = new Forms.ToolStripMenuItem("Install FFmpeg…") { Visible = !_service.HasFfmpeg };
         _ffmpegItem.Click += (_, _) => ShowFfmpegHelp();
@@ -199,6 +206,7 @@ public partial class App : System.Windows.Application
             ContextMenuStrip = menu,
             Visible = true,
         };
+        _tray.DoubleClick += (_, _) => ShowHelp();
     }
 
     private void ShowFfmpegHelp()

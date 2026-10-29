@@ -1,13 +1,13 @@
 ; Halora installer (Inno Setup 6.3+).
 ; Build: dotnet publish (framework-dependent, see build.yml), then
-;   iscc /DAppVersion=0.1.0 /DPublishDir=..\publish-setup installer\Halora.iss
+;   iscc /DAppVersion=0.2.0 /DPublishDir=..\publish-setup installer\Halora.iss
 ;
 ; Installs per user, no admin rights. Halora itself is ~25 MB (~4 MB compressed) because it uses the
 ; shared .NET Desktop Runtime. When no runtime 8 or newer is installed, setup downloads .NET 10 from
 ; Microsoft and installs it (that step asks for admin once).
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.2.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\publish-setup"

@@ -13,7 +13,7 @@
     <RootNamespace>Halora.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\halora.ico</ApplicationIcon>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>Halora</Product>
     <Description>Drag a file, hold Shift, let go, convert.</Description>
     <!-- Lets the project build (not run) on Linux/macOS CI too. -->

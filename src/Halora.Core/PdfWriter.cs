@@ -1,22 +1,111 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Text;
 
 namespace Halora.Core;
 
+/// <summary>One page picture, already encoded the way the PDF will store it.</summary>
+/// <param name="Filter">"/DCTDecode" for JPEG data, "/FlateDecode" for zlib-compressed pixels.</param>
+/// <param name="DecodeParms">PDF decode parameters, or null.</param>
+public sealed record PdfImage(int Width, int Height, string ColorSpace, string Filter, string? DecodeParms, byte[] Data)
+{
+    /// <summary>The JPEG file as-is: no re-compression.</summary>
+    public static PdfImage FromJpeg(string path)
+    {
+        var info = JpegInfo.Read(path);
+        var colorSpace = info.Components switch
+        {
+            1 => "/DeviceGray",
+            4 => "/DeviceCMYK",
+            _ => "/DeviceRGB",
+        };
+
+        return new(info.Width, info.Height, colorSpace, "/DCTDecode", null, File.ReadAllBytes(path));
+    }
+
+    /// <summary>
+    /// Lossless pixels from a binary PPM (P6, 8-bit RGB): every pixel is kept exactly.
+    /// Rows get the PNG Paeth filter before zlib, which makes screenshots and graphics much smaller.
+    /// </summary>
+    public static PdfImage FromPpm(string path)
+    {
+        var file = File.ReadAllBytes(path);
+        var pos = 0;
+
+        string Token()
+        {
+            while (pos < file.Length && char.IsWhiteSpace((char)file[pos]))
+            {
+                pos++;
+            }
+
+            var start = pos;
+            while (pos < file.Length && !char.IsWhiteSpace((char)file[pos]))
+            {
+                pos++;
+            }
+
+            return Encoding.ASCII.GetString(file, start, pos - start);
+        }
+
+        if (Token() != "P6" || !int.TryParse(Token(), out var width) || !int.TryParse(Token(), out var height) || Token() != "255")
+        {
+            throw new InvalidDataException("Not an 8-bit binary PPM image.");
+        }
+
+        pos++; // the single whitespace after the header
+        var stride = width * 3;
+        if (width <= 0 || height <= 0 || file.Length - pos < (long)stride * height)
+        {
+            throw new InvalidDataException("PPM image is truncated.");
+        }
+
+        using var compressed = new MemoryStream();
+        using (var zlib = new ZLibStream(compressed, CompressionLevel.SmallestSize, leaveOpen: true))
+        {
+            var row = new byte[stride + 1];
+            row[0] = 4; // Paeth
+            for (var y = 0; y < height; y++)
+            {
+                var cur = pos + (y * stride);
+                var prev = cur - stride;
+                for (var x = 0; x < stride; x++)
+                {
+                    int a = x >= 3 ? file[cur + x - 3] : 0;
+                    int b = y > 0 ? file[prev + x] : 0;
+                    int c = x >= 3 && y > 0 ? file[prev + x - 3] : 0;
+                    row[x + 1] = (byte)(file[cur + x] - Paeth(a, b, c));
+                }
+
+                zlib.Write(row);
+            }
+        }
+
+        return new(width, height, "/DeviceRGB", "/FlateDecode",
+            $"<< /Predictor 15 /Colors 3 /BitsPerComponent 8 /Columns {width} >>", compressed.ToArray());
+    }
+
+    private static int Paeth(int a, int b, int c)
+    {
+        var p = a + b - c;
+        var pa = Math.Abs(p - a);
+        var pb = Math.Abs(p - b);
+        var pc = Math.Abs(p - c);
+        return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+    }
+}
+
 /// <summary>
-/// Writes a minimal PDF where every page is one JPEG, embedded as-is (DCTDecode),
-/// so there is no re-compression. Pages are sized to the image at 96 DPI.
+/// Writes a minimal PDF with one picture per page. Pages are sized to the picture at 96 DPI.
 /// </summary>
 public static class PdfWriter
 {
-    public static void WriteJpegPages(IReadOnlyList<string> jpegPaths, string outputPath)
+    public static void WritePages(IReadOnlyList<PdfImage> pages, string outputPath)
     {
-        if (jpegPaths.Count == 0)
+        if (pages.Count == 0)
         {
-            throw new ArgumentException("No pages to write.", nameof(jpegPaths));
+            throw new ArgumentException("No pages to write.", nameof(pages));
         }
-
-        var pages = jpegPaths.Select(p => (Data: File.ReadAllBytes(p), Info: JpegInfo.Read(p))).ToList();
 
         // Object numbers: 1 catalog, 2 page tree, then 3 per page (page, image, content).
         var pageObj = new int[pages.Count];
@@ -40,16 +129,11 @@ public static class PdfWriter
 
         for (var i = 0; i < pages.Count; i++)
         {
-            var (data, info) = pages[i];
+            var image = pages[i];
             var p = pageObj[i];
-            var w = Num(info.Width * 72.0 / 96.0);
-            var h = Num(info.Height * 72.0 / 96.0);
-            var colorSpace = info.Components switch
-            {
-                1 => "/DeviceGray",
-                4 => "/DeviceCMYK",
-                _ => "/DeviceRGB",
-            };
+            var w = Num(image.Width * 72.0 / 96.0);
+            var h = Num(image.Height * 72.0 / 96.0);
+            var parms = image.DecodeParms is null ? "" : $" /DecodeParms {image.DecodeParms}";
 
             offsets[p] = stream.Position;
             Write(stream,
@@ -58,9 +142,9 @@ public static class PdfWriter
 
             offsets[p + 1] = stream.Position;
             Write(stream,
-                $"{p + 1} 0 obj\n<< /Type /XObject /Subtype /Image /Width {info.Width} /Height {info.Height} " +
-                $"/ColorSpace {colorSpace} /BitsPerComponent 8 /Filter /DCTDecode /Length {data.Length} >>\nstream\n");
-            stream.Write(data);
+                $"{p + 1} 0 obj\n<< /Type /XObject /Subtype /Image /Width {image.Width} /Height {image.Height} " +
+                $"/ColorSpace {image.ColorSpace} /BitsPerComponent 8 /Filter {image.Filter}{parms} /Length {image.Data.Length} >>\nstream\n");
+            stream.Write(image.Data);
             Write(stream, "\nendstream\nendobj\n");
 
             var content = $"q {w} 0 0 {h} 0 0 cm /Im0 Do Q";
