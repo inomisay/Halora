@@ -427,6 +427,9 @@ test-results/
 *.app
 !src/Halora.App/
 !src/Halora.App/**
+# The exception above must not bring back build output ("Halora.App" matches *.app on Windows).
+src/Halora.App/[Bb]in/
+src/Halora.App/[Oo]bj/
 
 # content below from: https://github.com/github/gitignore/blob/master/Global/macOS.gitignore
 # General
