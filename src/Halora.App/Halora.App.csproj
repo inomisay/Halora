@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\halora.ico" />
+    <Resource Include="Assets\logo.png" />
   </ItemGroup>
 
 </Project>

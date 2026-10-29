@@ -8,6 +8,8 @@
     <Color x:Key="HaloEnd">#F0A6CA</Color>
 
     <SolidColorBrush x:Key="InkBrush" Color="{StaticResource InkColor}" />
+    <!-- Fully opaque, for windows with text that must not show what's behind them. -->
+    <SolidColorBrush x:Key="InkSolidBrush" Color="#16141F" />
     <SolidColorBrush x:Key="InkSoftBrush" Color="{StaticResource InkSoftColor}" />
     <SolidColorBrush x:Key="HairlineBrush" Color="#2EFFFFFF" />
     <SolidColorBrush x:Key="TextBrush" Color="#F5F3FF" />
@@ -102,6 +104,91 @@
         <Setter Property="CornerRadius" Value="5" />
         <Setter Property="Padding" Value="6,0" />
         <Setter Property="Margin" Value="2,0" />
+    </Style>
+
+    <!-- Tray menu: dark rounded card with the logo on top, replacing the Windows Forms menu. -->
+    <Style x:Key="TrayMenu" TargetType="ContextMenu">
+        <Style.Resources>
+            <!-- Tray menu row. Checkable rows show a switch instead of a check mark. -->
+            <Style TargetType="MenuItem">
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="MenuItem">
+                            <Border x:Name="Bg" Background="Transparent" CornerRadius="8" Margin="6,1" Padding="10,7">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" />
+                                    <Border x:Name="Switch" Grid.Column="1" Width="30" Height="17" CornerRadius="8.5" Margin="18,0,0,0"
+                                            Background="#30FFFFFF" VerticalAlignment="Center" Visibility="Collapsed">
+                                        <Ellipse x:Name="Knob" Width="11" Height="11" Margin="3,0" Fill="{StaticResource MutedTextBrush}"
+                                                 HorizontalAlignment="Left" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter TargetName="Bg" Property="Background" Value="#1FFFFFFF" />
+                                </Trigger>
+                                <Trigger Property="IsCheckable" Value="True">
+                                    <Setter TargetName="Switch" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Switch" Property="Background" Value="{StaticResource HaloBrush}" />
+                                    <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                                    <Setter TargetName="Knob" Property="Fill" Value="#1A1530" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.45" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Style.Resources>
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="MinWidth" Value="240" />
+        <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="Placement" Value="MousePoint" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Margin="12" CornerRadius="12" Background="{StaticResource InkSolidBrush}"
+                            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1" Padding="0,6">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.45" Color="Black" />
+                        </Border.Effect>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="16,6,16,8">
+                                <Image Source="pack://application:,,,/Halora;component/Assets/logo.png" Width="18" Height="18"
+                                       RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center" />
+                                <TextBlock Text="Halora" Margin="9,0,0,0" FontFamily="{StaticResource DisplayFont}"
+                                           FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Rectangle Height="1" Fill="{StaticResource HairlineBrush}" Margin="12,0,12,4" />
+                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </StackPanel>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="TrayMenuSeparator" TargetType="Separator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Rectangle Height="1" Fill="{StaticResource HairlineBrush}" Margin="12,4" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Flat text button for the progress card. -->

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Halora.Core;
 using Forms = System.Windows.Forms;
@@ -17,7 +19,8 @@ public partial class App : System.Windows.Application
     private DropCatcherWindow? _catcher;
     private RadialMenuWindow? _menu;
     private Forms.NotifyIcon? _tray;
-    private Forms.ToolStripMenuItem? _ffmpegItem;
+    private ContextMenu? _trayMenu;
+    private MenuItem? _ffmpegItem;
     private ConversionService _service = new(null);
     private readonly List<ProgressWindow> _cards = [];
     private HelpWindow? _help;
@@ -113,10 +116,6 @@ public partial class App : System.Windows.Application
     private void RefreshFfmpeg()
     {
         _service = new ConversionService(Ffmpeg.Locate(), new WindowsPdfRenderer());
-        if (_ffmpegItem is not null)
-        {
-            _ffmpegItem.Visible = !_service.HasFfmpeg;
-        }
     }
 
     private void OnFilesDropped(string[] files, Native.POINT point)
@@ -165,48 +164,71 @@ public partial class App : System.Windows.Application
 
     private void CreateTray()
     {
-        var menu = new Forms.ContextMenuStrip();
-
-        var title = new Forms.ToolStripMenuItem("Halora") { Enabled = false };
-        var enabled = new Forms.ToolStripMenuItem("On (Shift + drag)") { Checked = _settings.Enabled, CheckOnClick = true };
-        enabled.CheckedChanged += (_, _) =>
+        // Switches stay open on click so you see them flip.
+        var enabled = new MenuItem { Header = "On (Shift + drag)", IsCheckable = true, IsChecked = _settings.Enabled, StaysOpenOnClick = true };
+        enabled.Click += (_, _) =>
         {
-            _settings.Enabled = enabled.Checked;
+            _settings.Enabled = enabled.IsChecked;
             _settings.Save();
         };
 
-        var autostart = new Forms.ToolStripMenuItem("Start with Windows") { Checked = Autostart.IsOn, CheckOnClick = true };
-        autostart.CheckedChanged += (_, _) => Autostart.Set(autostart.Checked);
+        var autostart = new MenuItem { Header = "Start with Windows", IsCheckable = true, StaysOpenOnClick = true };
+        autostart.Click += (_, _) => Autostart.Set(autostart.IsChecked);
 
-        var howTo = new Forms.ToolStripMenuItem("How to use");
+        var howTo = new MenuItem { Header = "How to use" };
         howTo.Click += (_, _) => ShowHelp();
 
-        _ffmpegItem = new Forms.ToolStripMenuItem("Install FFmpeg…") { Visible = !_service.HasFfmpeg };
+        _ffmpegItem = new MenuItem { Header = "Install FFmpeg…" };
         _ffmpegItem.Click += (_, _) => ShowFfmpegHelp();
 
-        var logs = new Forms.ToolStripMenuItem("Open log folder");
+        var logs = new MenuItem { Header = "Open log folder" };
         logs.Click += (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
             "explorer.exe",
             System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Halora")) { UseShellExecute = true });
 
-        var quit = new Forms.ToolStripMenuItem("Quit");
+        var quit = new MenuItem { Header = "Quit" };
         quit.Click += (_, _) => Quit();
 
-        menu.Items.AddRange(new Forms.ToolStripItem[]
+        var separator = (Style)FindResource("TrayMenuSeparator");
+        var menu = _trayMenu = new ContextMenu { Style = (Style)FindResource("TrayMenu") };
+        foreach (var item in new Control[]
         {
-            title, new Forms.ToolStripSeparator(), enabled, autostart, new Forms.ToolStripSeparator(),
-            howTo, _ffmpegItem, logs, new Forms.ToolStripSeparator(), quit,
-        });
+            enabled, autostart, new Separator { Style = separator },
+            howTo, _ffmpegItem, logs, new Separator { Style = separator }, quit,
+        })
+        {
+            menu.Items.Add(item);
+        }
+
+        menu.Opened += (_, _) =>
+        {
+            autostart.IsChecked = Autostart.IsOn;
+            _ffmpegItem.Visibility = _service.HasFfmpeg ? Visibility.Collapsed : Visibility.Visible;
+
+            // A menu opened from the tray has no owner window. Bringing it to the front is what
+            // lets a click anywhere else close it, like a normal menu.
+            if (PresentationSource.FromVisual(menu) is HwndSource source)
+            {
+                Native.SetForegroundWindow(source.Handle);
+            }
+        };
 
         var iconStream = GetResourceStream(new Uri("pack://application:,,,/Assets/halora.ico"))?.Stream;
         _tray = new Forms.NotifyIcon
         {
-            Icon = iconStream is null ? System.Drawing.SystemIcons.Application : new System.Drawing.Icon(iconStream),
+            // Ask for the tray size so Windows picks the sharp frame instead of scaling a 32 px one.
+            Icon = iconStream is null ? System.Drawing.SystemIcons.Application : new System.Drawing.Icon(iconStream, Forms.SystemInformation.SmallIconSize),
             Text = "Halora · Shift + drag to convert",
-            ContextMenuStrip = menu,
             Visible = true,
         };
         _tray.DoubleClick += (_, _) => ShowHelp();
+        _tray.MouseUp += (_, e) =>
+        {
+            if (e.Button == Forms.MouseButtons.Right)
+            {
+                menu.IsOpen = true;
+            }
+        };
     }
 
     private void ShowFfmpegHelp()

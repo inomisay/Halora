@@ -31,7 +31,7 @@
         </Style>
     </Window.Resources>
 
-    <Border x:Name="Card" Margin="16" CornerRadius="18" Background="{StaticResource InkBrush}"
+    <Border x:Name="Card" Margin="16" CornerRadius="18" Background="{StaticResource InkSolidBrush}"
             BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1" Padding="26,20,26,22">
         <Border.Effect>
             <DropShadowEffect BlurRadius="24" ShadowDepth="3" Opacity="0.5" Color="Black" />
@@ -45,7 +45,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Image Source="pack://application:,,,/Halora;component/Assets/halora.ico" Width="32" Height="32" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,12,0" VerticalAlignment="Center" />
+                <Image Source="pack://application:,,,/Halora;component/Assets/logo.png" Width="32" Height="32" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,12,0" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="How to use Halora" Foreground="{StaticResource TextBrush}"
                                FontFamily="{StaticResource DisplayFont}" FontSize="19" FontWeight="SemiBold" />
