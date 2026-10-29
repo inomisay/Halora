@@ -95,12 +95,30 @@ begin
   Result := FileSearch('ffmpeg.exe', Dirs) <> '';
 end;
 
-procedure StopHalora;
+function HaloraRunning: Boolean;
 var
   Code: Integer;
 begin
+  // find exits with 0 when tasklist printed a Halora.exe line.
+  Result := Exec(ExpandConstant('{cmd}'), '/c tasklist /nh /fi "imagename eq Halora.exe" | find /i "Halora.exe"',
+    '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
+end;
+
+procedure StopHalora;
+var
+  Code, Waited: Integer;
+begin
   // Halora is a tray app with nothing to save, so ending it is safe. Needed to replace or remove the exe.
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /im Halora.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
+
+  // taskkill returns before Windows has released the exe file. Wait (up to 10 s) until the process is gone.
+  Waited := 0;
+  while HaloraRunning and (Waited < 10000) do
+  begin
+    Sleep(250);
+    Waited := Waited + 250;
+  end;
+  Sleep(500); // the file lock can outlive the process by a moment
 end;
 
 procedure InitializeWizard;
