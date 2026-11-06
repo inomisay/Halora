@@ -4,6 +4,8 @@
 
 <p align="center">Drag a file, hold Shift, let go. Pick a format. Done.</p>
 
+<p align="center">Made by <a href="https://github.com/inomisay">Yasamin Valishariatpanahi</a> · <a href="https://halora-azure.vercel.app">Website</a></p>
+
 Halora is a small Windows tray app for converting files without opening anything. Start dragging a file from Explorer or the desktop, hold **Shift**, and let go anywhere. A ring of formats opens where you dropped it. Click one, and the converted file is saved next to the original.
 
 Everything runs on your PC. Nothing is uploaded.
