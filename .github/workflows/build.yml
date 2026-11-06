@@ -78,6 +78,11 @@ jobs:
         shell: pwsh
         run: '& "$env:RUNNER_TEMP\inno\ISCC.exe" /Q "/DAppVersion=${{ steps.version.outputs.value }}" installer/Halora.iss'
 
+      # The same installer under a name that never changes, so the website can always link to the latest one.
+      - name: Copy installer to a stable name
+        shell: pwsh
+        run: Copy-Item (Get-Item dist/Halora-Setup-*.exe).FullName Halora-Setup.exe
+
       - uses: actions/upload-artifact@v4
         with:
           name: Halora-win-x64
@@ -90,4 +95,5 @@ jobs:
         with:
           files: |
             Halora-win-x64.zip
+            Halora-Setup.exe
             dist/Halora-Setup-*.exe
