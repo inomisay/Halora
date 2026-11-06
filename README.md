@@ -31,6 +31,14 @@ Download from [Releases](../../releases). There are two versions:
   winget install Gyan.FFmpeg
   ```
 
+For the best image quality, also install [ImageMagick](https://imagemagick.org) (setup offers this too):
+
+```
+winget install ImageMagick.ImageMagick
+```
+
+With it, image conversions keep the color profile, camera data (EXIF) and 16-bit depth, PNG/GIF/BMP/TIFF to WebP is lossless, and JPG and AVIF keep full color resolution. Without it, Halora converts images with FFmpeg.
+
 Halora appears in the tray and opens a short **How to use** guide the first time. Double-click the tray icon to see it again, or right-click it for settings like **Start with Windows**.
 
 Windows SmartScreen may warn the first time because the app isn't code-signed yet. Click **More info → Run anyway**.
@@ -44,7 +52,7 @@ Windows has no event for "a file is being dragged somewhere", so Halora:
 3. shows an invisible drop window that follows the cursor,
 4. reads the file paths when you let go, and always answers **Copy** so Explorer never deletes the original. In Explorer, Shift + drag normally means *move*.
 
-Conversions use [FFmpeg](https://ffmpeg.org). PDF pages are rendered with the PDF engine built into Windows. Images → PDF is written by Halora itself. JPG photos go in byte for byte, with no re-compression. PNG, BMP, TIFF and GIF pages are stored losslessly, so screenshots and text stay pixel-sharp. Only already-lossy formats (WebP, AVIF, HEIC) and rotated JPGs get one high-quality JPEG pass.
+Video and audio are converted with [FFmpeg](https://ffmpeg.org). Images use [ImageMagick](https://imagemagick.org) when it's installed, falling back to FFmpeg. PDF pages are rendered with the PDF engine built into Windows. Images → PDF is written by Halora itself. JPG photos go in byte for byte, with no re-compression. PNG, BMP, TIFF and GIF pages are stored losslessly, so screenshots and text stay pixel-sharp. Only already-lossy formats (WebP, AVIF, HEIC) and rotated JPGs get one high-quality JPEG pass.
 
 ```
 src/Halora.Core    conversions, formats, file naming (plain .NET, tested on Linux too)
@@ -71,4 +79,8 @@ The installer is built with [Inno Setup](https://jrsoftware.org/isinfo.php) 6 fr
 
 ## License
 
-MIT. FFmpeg is a separate program with its own license and isn't bundled.
+Copyright (C) 2026 Yasamin Valishariatpanahi (inomisay).
+
+Halora is free software under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-only). You may use, study, change and share it. If you share a changed version or anything built from Halora's code, it must also be released under GPL-3.0 with its source code, and keep this copyright notice.
+
+FFmpeg and ImageMagick are separate programs with their own licenses and aren't bundled.

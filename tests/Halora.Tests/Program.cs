@@ -74,6 +74,12 @@ File.Delete(existing);
 Console.WriteLine("Error messages");
 Check("no audio explained", Ffmpeg.Explain("Stream map '0:a:0' matches no streams.").Contains("no sound"));
 Check("last line fallback", Ffmpeg.Explain("line one\nreal problem\n") == "real problem");
+Check("magick error trimmed", Magick.Explain("magick: improper image header `x.png' @ error/png.c/ReadPNGImage/4092.") == "improper image header `x.png'");
+Check("magick unreadable explained", Magick.Explain("no decode delegate for this image format `HEIC'").Contains("can't read"));
+
+var magickIn = MagickArgs.Build(ActionCatalog.All.First(a => a.Id == "img.png"), Path.Combine(root, "shot [1].jpg"), Path.Combine(root, "shot [1].png"));
+Check("magick reads only frame 0, so brackets in names are safe", magickIn.Contains(Path.Combine(root, "shot [1].jpg") + "[0]"));
+Check("magick output format is explicit", magickIn[^1] == "PNG:" + Path.Combine(root, "shot [1].png"));
 
 Console.WriteLine("Argument safety");
 var weird = Path.Combine(root, "my \"odd\" file, v2.png");
@@ -246,7 +252,11 @@ else
             System.Text.RegularExpressions.Regex.Matches(combined, "/FlateDecode").Count == 2 &&
             System.Text.RegularExpressions.Regex.Matches(combined, "/DCTDecode").Count == 1);
     }
-    if (pdf.Status == ResultStatus.Done)
+    if (pdf.Status == ResultStatus.Done && ExternalTool.Locate("qpdf") is null)
+    {
+        Console.WriteLine("qpdf/poppler not found; skipping PDF validity checks");
+    }
+    else if (pdf.Status == ResultStatus.Done)
     {
         Run("qpdf", "--check", pdf.Output!);
         var info = Run("pdfinfo", pdf.Output!);
@@ -292,6 +302,131 @@ else
     }
 
     Check("cancel stops and cleans up", cancelled && !File.Exists(Path.Combine(root, "long.webm")));
+}
+
+// ---------- Quality checks (real ImageMagick) ----------
+var magick = Magick.Locate();
+if (magick is null)
+{
+    Console.WriteLine("magick not found; skipping ImageMagick checks");
+}
+else
+{
+    Console.WriteLine($"Quality with {magick}");
+    var mdir = Path.Combine(root, "magick");
+    Directory.CreateDirectory(mdir);
+    var mservice = new ConversionService(ffmpeg, null, magick);
+
+    string Im(params string[] args) => Run(magick, args);
+    string Prop(string file, string format) => Im("identify", "-quiet", "-format", format, file + "[0]");
+
+    async Task<string> Convert(string id, string file)
+    {
+        var r = (await mservice.RunAsync(ActionCatalog.All.First(a => a.Id == id), [file])).First();
+        Check($"magick {id} on {Path.GetFileName(file)}", r.Status == ResultStatus.Done && File.Exists(r.Output), r.Message ?? "");
+        return r.Output ?? "";
+    }
+
+    // Number of pixels that differ; 0 means identical. compare exits 1 when they differ, so read it directly.
+    string DifferentPixels(string a, string b)
+    {
+        var info = new ProcessStartInfo(magick) { RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var arg in new[] { "compare", "-metric", "AE", a + "[0]", b + "[0]", "null:" })
+        {
+            info.ArgumentList.Add(arg);
+        }
+
+        using var p = Process.Start(info)!;
+        var text = p.StandardError.ReadToEnd() + p.StandardOutput.ReadToEnd();
+        p.WaitForExit();
+        return text.Trim().Split(' ')[0];
+    }
+
+    // A camera-style JPEG: 80x40 pixels stored sideways, EXIF saying "rotate 90°", and a camera name.
+    var stripped = Path.Combine(mdir, "plain.jpg");
+    Im("-size", "80x40", "gradient:red-blue", "-strip", stripped);
+    byte[] tiff =
+    [
+        .. "MM"u8, 0, 42, 0, 0, 0, 8, 0, 2,
+        0x01, 0x0F, 0, 2, 0, 0, 0, 10, 0, 0, 0, 38, // Make: ASCII, 10 bytes, at offset 38
+        0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0,   // Orientation = 6
+        0, 0, 0, 0,
+        .. "HaloraCam\0"u8,
+    ];
+    var segment = 2 + 6 + tiff.Length;
+    byte[] app1 = [0xFF, 0xE1, (byte)(segment >> 8), (byte)segment, .. "Exif\0\0"u8, .. tiff];
+    var plainBytes = File.ReadAllBytes(stripped);
+    var camera = Path.Combine(mdir, "camera.jpg");
+    File.WriteAllBytes(camera, [.. plainBytes[..2], .. app1, .. plainBytes[2..]]);
+    Check("fixture has EXIF", Prop(camera, "%[EXIF:Make]") == "HaloraCam");
+
+    var upright = await Convert("img.png", camera);
+    Check("photo is turned upright by its EXIF orientation", Prop(upright, "%wx%h") == "40x80", Prop(upright, "%wx%h"));
+    Check("camera data survives jpg -> png", Prop(upright, "%[EXIF:Make]") == "HaloraCam");
+    Check("camera data survives jpg -> webp", Prop(await Convert("img.webp", camera), "%[EXIF:Make]") == "HaloraCam");
+
+    // An 8-bit PNG (like nearly every screenshot) with a half-transparent rectangle.
+    var colored = Path.Combine(mdir, "colored.png");
+    Im("-size", "97x61", "gradient:orange-purple", "(", "-size", "97x61", "xc:none", "-fill", "#3366ff80", "-draw", "rectangle 10,10 60,40", ")", "-composite", "-depth", "8", colored);
+
+    var lossless = await Convert("img.webp", colored);
+    Check("png -> webp keeps every pixel (lossless)", DifferentPixels(colored, lossless) == "0", DifferentPixels(colored, lossless));
+    var flat = await Convert("img.jpg", colored);
+
+    // Color profiles. (PNG output stores the standard sRGB profile as its short sRGB tag, which means the same.)
+    bool HasIcc(string file)
+    {
+        var icc = file + ".icc";
+        try
+        {
+            Im(file + "[0]", "ICC:" + icc);
+            return new FileInfo(icc).Length > 0;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    var icm = @"C:\Windows\System32\spool\drivers\color\sRGB Color Space Profile.icm";
+    if (File.Exists(icm))
+    {
+        var profiled = Path.Combine(mdir, "profiled.tif");
+        Im(colored, "-profile", icm, profiled);
+        Check("fixture has a color profile", HasIcc(profiled));
+        Check("color profile survives tif -> jpg", HasIcc(await Convert("img.jpg", profiled)));
+        Check("color profile survives tif -> webp", HasIcc(await Convert("img.webp", profiled)));
+        Check("color profile survives tif -> avif", HasIcc(await Convert("img.avif", profiled)));
+    }
+
+    if (ffmpeg is not null) Check("jpg keeps full color resolution (4:4:4)", Probe(flat, "stream=pix_fmt").Contains("444"), Probe(flat, "stream=pix_fmt"));
+    var red = Prop(flat, "%[fx:int(255*p{35,25}.r)]");
+    Check("jpg flattens on white (not black)", int.Parse(red) > 100, red);
+
+    var avif = await Convert("img.avif", colored);
+    if (ffmpeg is not null) Check("avif keeps full color resolution (4:4:4)", Probe(avif, "stream=pix_fmt").Contains("444"), Probe(avif, "stream=pix_fmt"));
+
+    var deep = Path.Combine(mdir, "deep.tif");
+    Im("-size", "64x48", "gradient:", "-depth", "16", deep);
+    Check("16-bit tiff -> png stays 16-bit", Prop(await Convert("img.png", deep), "%z") == "16");
+
+    var halfPng = await Convert("img.half", colored);
+    Check("50% resize (97x61 rounds to 49x31)", Prop(halfPng, "%wx%h") == "49x31", Prop(halfPng, "%wx%h"));
+
+    var gifAnim = Path.Combine(mdir, "anim.gif");
+    Im("-size", "30x20", "xc:red", "xc:lime", "xc:blue", "-set", "delay", "10", "-loop", "0", gifAnim);
+    var webpAnim = await Convert("img.webp", gifAnim);
+    var frames = Im("identify", "-quiet", "-format", "%n\n", webpAnim).Split('\n')[0].Trim();
+    Check("animated gif -> webp keeps all frames", frames == "3", frames);
+
+    var pdf = (await mservice.RunAsync(ActionCatalog.All.First(a => a.Id == "img.pdf"), [camera, colored])).First();
+    Check("magick combine to pdf", pdf.Status == ResultStatus.Done, pdf.Message ?? "");
+    if (pdf.Status == ResultStatus.Done)
+    {
+        var text = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(pdf.Output!));
+        Check("rotated photo is upright in the pdf", text.Contains("/Width 40 /Height 80"));
+        Check("png page is lossless", text.Contains("/FlateDecode"));
+    }
 }
 
 Directory.Delete(root, recursive: true);

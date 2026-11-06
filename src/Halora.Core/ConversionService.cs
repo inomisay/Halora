@@ -19,9 +19,21 @@ public sealed record ConversionResult(string Source, ResultStatus Status, string
 
 public sealed record ConversionProgress(int Completed, int Total, string CurrentFile);
 
-public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRenderer = null)
+/// <param name="ffmpegPath">FFmpeg, for video, audio, and images when ImageMagick is missing.</param>
+/// <param name="magickPath">ImageMagick, preferred for images because it keeps quality and metadata.</param>
+public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRenderer = null, string? magickPath = null)
 {
     public bool HasFfmpeg => ffmpegPath is not null;
+
+    public bool HasMagick => magickPath is not null;
+
+    /// <summary>Whether the tools this action needs are installed.</summary>
+    public bool CanRun(ConversionAction action) => action.Engine switch
+    {
+        Engine.RenderPdf => true,
+        _ when action.Kind == MediaKind.Image => HasMagick || HasFfmpeg,
+        _ => HasFfmpeg,
+    };
 
     public async Task<IReadOnlyList<ConversionResult>> RunAsync(
         ConversionAction action,
@@ -77,7 +89,8 @@ public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRende
 
     private async Task<ConversionResult> ConvertOneAsync(ConversionAction action, string file, CancellationToken ct)
     {
-        if (ffmpegPath is null)
+        var useMagick = magickPath is not null && MagickArgs.Handles(action);
+        if (!useMagick && ffmpegPath is null)
         {
             return new(file, ResultStatus.Failed, Message: FfmpegMissing);
         }
@@ -85,10 +98,24 @@ public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRende
         var output = OutputPaths.NextTo(file, action.OutputExtensionFor(file), action.Suffix);
         try
         {
-            await Ffmpeg.RunAsync(ffmpegPath, FfmpegArgs.Build(action, file, output), ct).ConfigureAwait(false);
+            if (useMagick)
+            {
+                try
+                {
+                    await Magick.RunAsync(magickPath!, MagickArgs.Build(action, file, output), ct).ConfigureAwait(false);
+                    return new(file, ResultStatus.Done, output);
+                }
+                catch (MagickException) when (ffmpegPath is not null)
+                {
+                    // Some ImageMagick builds can't read every format (HEIC, for one). FFmpeg may.
+                    TryDelete(output);
+                }
+            }
+
+            await Ffmpeg.RunAsync(ffmpegPath!, FfmpegArgs.Build(action, file, output), ct).ConfigureAwait(false);
             return new(file, ResultStatus.Done, output);
         }
-        catch (Exception ex) when (ex is FfmpegException or OperationCanceledException or IOException)
+        catch (Exception ex) when (ex is ToolException or OperationCanceledException or IOException)
         {
             TryDelete(output);
             if (ex is OperationCanceledException)
@@ -103,7 +130,7 @@ public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRende
     private async Task<ConversionResult> CombineAsync(IReadOnlyList<string> images, CancellationToken ct)
     {
         var first = images[0];
-        if (ffmpegPath is null)
+        if (ffmpegPath is null && magickPath is null)
         {
             return new(first, ResultStatus.Failed, Message: FfmpegMissing);
         }
@@ -131,7 +158,7 @@ public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRende
                 if (Formats.IsLossless(image))
                 {
                     var pixels = Path.Combine(temp, $"{i:D4}.ppm");
-                    await Ffmpeg.RunAsync(ffmpegPath, FfmpegArgs.ImageToPpmForPdf(image, pixels), ct).ConfigureAwait(false);
+                    await PageAsync(MagickArgs.ImageToPpmForPdf(image, pixels), FfmpegArgs.ImageToPpmForPdf(image, pixels), ct).ConfigureAwait(false);
                     pages.Add(PdfImage.FromPpm(pixels));
                     File.Delete(pixels);
                     continue;
@@ -139,14 +166,14 @@ public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRende
 
                 // Already-lossy photos (WebP, AVIF, HEIC, rotated JPG): one high-quality JPEG pass.
                 var page = Path.Combine(temp, $"{i:D4}.jpg");
-                await Ffmpeg.RunAsync(ffmpegPath, FfmpegArgs.ImageToJpegForPdf(image, page), ct).ConfigureAwait(false);
+                await PageAsync(MagickArgs.ImageToJpegForPdf(image, page), FfmpegArgs.ImageToJpegForPdf(image, page), ct).ConfigureAwait(false);
                 pages.Add(PdfImage.FromJpeg(page));
             }
 
             PdfWriter.WritePages(pages, output);
             return new(first, ResultStatus.Done, output);
         }
-        catch (Exception ex) when (ex is FfmpegException or IOException or InvalidDataException)
+        catch (Exception ex) when (ex is ToolException or IOException or InvalidDataException)
         {
             TryDelete(output);
             return new(first, ResultStatus.Failed, Message: ex.Message);
@@ -162,6 +189,24 @@ public sealed class ConversionService(string? ffmpegPath, IPdfRenderer? pdfRende
                 // Temp files are cleaned up by Windows eventually.
             }
         }
+    }
+
+    /// <summary>Makes one PDF page image with ImageMagick, or FFmpeg when ImageMagick is missing or can't read it.</summary>
+    private async Task PageAsync(List<string> magickArgs, List<string> ffmpegArgs, CancellationToken ct)
+    {
+        if (magickPath is not null)
+        {
+            try
+            {
+                await Magick.RunAsync(magickPath, magickArgs, ct).ConfigureAwait(false);
+                return;
+            }
+            catch (MagickException) when (ffmpegPath is not null)
+            {
+            }
+        }
+
+        await Ffmpeg.RunAsync(ffmpegPath!, ffmpegArgs, ct).ConfigureAwait(false);
     }
 
     private async Task<ConversionResult> RenderPdfAsync(ConversionAction action, string file, CancellationToken ct)

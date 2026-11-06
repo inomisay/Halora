@@ -140,6 +140,20 @@
                 </Grid>
             </Border>
 
+            <!-- Only when ImageMagick is missing -->
+            <Border x:Name="MagickPanel" Margin="0,12,0,0" Padding="14,10" CornerRadius="12"
+                    Background="#14FFFFFF" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource Body}" VerticalAlignment="Center" Margin="0,0,12,0"
+                               Text="For the best image quality, add ImageMagick. It keeps colors, camera data and every pixel." />
+                    <Button x:Name="MagickButton" Grid.Column="1" Content="Get ImageMagick…" Style="{StaticResource LinkButton}" />
+                </Grid>
+            </Border>
+
             <Button x:Name="DoneButton" Content="Got it" Style="{StaticResource PrimaryButton}"
                     HorizontalAlignment="Right" Margin="0,18,0,0" IsDefault="True" />
         </StackPanel>

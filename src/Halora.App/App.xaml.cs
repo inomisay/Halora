@@ -21,6 +21,7 @@ public partial class App : System.Windows.Application
     private Forms.NotifyIcon? _tray;
     private ContextMenu? _trayMenu;
     private MenuItem? _ffmpegItem;
+    private MenuItem? _magickItem;
     private ConversionService _service = new(null);
     private readonly List<ProgressWindow> _cards = [];
     private HelpWindow? _help;
@@ -44,7 +45,7 @@ public partial class App : System.Windows.Application
         };
 
         _settings = Settings.Load();
-        RefreshFfmpeg();
+        RefreshTools();
 
         var catcher = _catcher = new DropCatcherWindow();
         catcher.FilesDropped += OnFilesDropped;
@@ -107,15 +108,15 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        _help = new HelpWindow(_service.HasFfmpeg, ShowFfmpegHelp);
+        _help = new HelpWindow(_service.HasFfmpeg, ShowFfmpegHelp, _service.HasMagick, ShowMagickHelp);
         _help.Closed += (_, _) => _help = null;
         _help.Show();
         _help.Activate();
     }
 
-    private void RefreshFfmpeg()
+    private void RefreshTools()
     {
-        _service = new ConversionService(Ffmpeg.Locate(), new WindowsPdfRenderer());
+        _service = new ConversionService(Ffmpeg.Locate(), new WindowsPdfRenderer(), Magick.Locate());
     }
 
     private void OnFilesDropped(string[] files, Native.POINT point)
@@ -136,10 +137,11 @@ public partial class App : System.Windows.Application
 
     private async void OnActionChosen(ConversionAction action, IReadOnlyList<string> files)
     {
-        if (action.Engine != Engine.RenderPdf && !_service.HasFfmpeg)
+        // Maybe FFmpeg or ImageMagick was installed since startup.
+        if (!_service.CanRun(action) || (action.Kind == MediaKind.Image && !_service.HasMagick))
         {
-            RefreshFfmpeg(); // maybe it was installed since startup
-            if (!_service.HasFfmpeg)
+            RefreshTools();
+            if (!_service.CanRun(action))
             {
                 ShowFfmpegHelp();
                 return;
@@ -181,6 +183,9 @@ public partial class App : System.Windows.Application
         _ffmpegItem = new MenuItem { Header = "Install FFmpeg…" };
         _ffmpegItem.Click += (_, _) => ShowFfmpegHelp();
 
+        _magickItem = new MenuItem { Header = "Best image quality…" };
+        _magickItem.Click += (_, _) => ShowMagickHelp();
+
         var logs = new MenuItem { Header = "Open log folder" };
         logs.Click += (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
             "explorer.exe",
@@ -194,7 +199,7 @@ public partial class App : System.Windows.Application
         foreach (var item in new Control[]
         {
             enabled, autostart, new Separator { Style = separator },
-            howTo, _ffmpegItem, logs, new Separator { Style = separator }, quit,
+            howTo, _ffmpegItem, _magickItem, logs, new Separator { Style = separator }, quit,
         })
         {
             menu.Items.Add(item);
@@ -204,6 +209,7 @@ public partial class App : System.Windows.Application
         {
             autostart.IsChecked = Autostart.IsOn;
             _ffmpegItem.Visibility = _service.HasFfmpeg ? Visibility.Collapsed : Visibility.Visible;
+            _magickItem.Visibility = _service.HasMagick ? Visibility.Collapsed : Visibility.Visible;
 
             // A menu opened from the tray has no owner window. Bringing it to the front is what
             // lets a click anywhere else close it, like a normal menu.
@@ -248,6 +254,26 @@ public partial class App : System.Windows.Application
             "Open Terminal and run:\n\n    " + command + "\n\n" +
             "(It's already copied to your clipboard.) Then try again. You don't need to restart Halora.",
             "Halora needs FFmpeg", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void ShowMagickHelp()
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(Magick.InstallCommand);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            // Clipboard busy; the message still shows the command.
+        }
+
+        System.Windows.MessageBox.Show(
+            "With ImageMagick, a free open-source image tool, Halora keeps your images' color profile, " +
+            "camera data and full detail: PNG to WebP becomes lossless, and JPG and AVIF keep full color.\n\n" +
+            "Open Terminal and run:\n\n    " + Magick.InstallCommand + "\n\n" +
+            "(It's already copied to your clipboard.) You don't need to restart Halora. " +
+            "Without it, images are converted with FFmpeg.",
+            "Best image quality", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void Quit()

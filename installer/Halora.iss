@@ -44,6 +44,7 @@ CloseApplications=no
 [Tasks]
 Name: autostart; Description: "Start Halora with Windows"
 Name: ffmpeg; Description: "Install FFmpeg with winget (needed for all conversions except PDF to image)"; Check: not HasFfmpeg
+Name: magick; Description: "Install ImageMagick with winget (best image quality: keeps colors, camera data and every pixel)"; Check: not HasMagick
 
 [Files]
 Source: "{#PublishDir}\Halora.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -59,6 +60,9 @@ Root: HKCU; Subkey: "{#RunKey}"; ValueType: string; ValueName: "Halora"; ValueDa
 Filename: "{localappdata}\Microsoft\WindowsApps\winget.exe"; \
   Parameters: "install --exact --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements"; \
   StatusMsg: "Installing FFmpeg..."; Tasks: ffmpeg; Flags: waituntilterminated skipifdoesntexist
+Filename: "{localappdata}\Microsoft\WindowsApps\winget.exe"; \
+  Parameters: "install --exact --id ImageMagick.ImageMagick --accept-source-agreements --accept-package-agreements"; \
+  StatusMsg: "Installing ImageMagick..."; Tasks: magick; Flags: waituntilterminated skipifdoesntexist
 Filename: "{app}\Halora.exe"; Description: "Start Halora now"; Flags: nowait postinstall skipifsilent
 
 [Code]
@@ -93,6 +97,18 @@ begin
   // The same places Halora looks, minus the machine PATH setup can't see changes to.
   Dirs := GetEnv('PATH') + ';' + ExpandConstant('{localappdata}\Microsoft\WinGet\Links');
   Result := FileSearch('ffmpeg.exe', Dirs) <> '';
+end;
+
+function HasMagick: Boolean;
+var
+  Rec: TFindRec;
+begin
+  Result := FileSearch('magick.exe', GetEnv('PATH')) <> '';
+  if not Result and FindFirst(ExpandConstant('{commonpf64}\ImageMagick-7*'), Rec) then
+  begin
+    Result := True;
+    FindClose(Rec);
+  end;
 end;
 
 function HaloraRunning: Boolean;
